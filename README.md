@@ -1,2 +1,3 @@
-# STAT350-Final-Project
-STAT350 Final Project - Anna Pham
+# STAT350-Project
+
+Anna Pham's Final Project for STAT350 

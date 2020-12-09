@@ -1,0 +1,323 @@
+---
+title: "STAT350 Project"
+author: "Anna Pham - Group 24"
+date: "December 8, 2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+### ABSTRACT {.css_class} 
+
+Cancer is one of the leading causes of death in the USA and worldwide. There are several factors that might affect the cancer mortality rate, for example, incident rates, or the gender and age of a person. According to cancer.gov, we can study the trends of cancer mortality and incidence rate to see if there are better treatments in curing cancer in case there is a negative relationship between the factors. In this data analysis, we are interested to learn if there is a the correlation of cancer mortality rate, focusing on death causes by lung cancer in the USA, with different socioeconomics factors, such as age, income or poverty status.
+
+### INTRODUCTION {.css_class}
+
+There are two big questions we want to learn in this data analysis.  
+
+First, we want to examine the relationship between the lung cancer mortality rate and the incidence rate. Through this analysis, we can examine the likelihood of dying if diagnosed with a lung cancer is consistent across counties.  
+
+Secondly, we want to learn if the socioeconomic factors affects the cancer mortality rates across the counties in the USA. The chosen factors are:  
+1.	**Median Age:** According to cancer.gov, the median age to be diagnosed lung cancer is 70. 
+With different median age across the counties, we are interested to know how age affect the incidence rate in each counties.  
+2.	**Income:** Income plays an important role to determine standard of living, which affects the chance of getting cancer. We want to know if income have a positive or negative relationship with incidence rates.  
+3.	**Poverty status:** Similar to income, poverty status affects the standard of living. We want to know if poverty status has a significant relationship to incidence rates.  
+4.	**Health Insurance:** Early diagnosis and treatments might reduce the cancer mortality rate. We want to know that relationship holds for lung cancer.  
+
+
+### DATA DESCRIPTION {.css_class}
+
+The 2 .csv files given in the dataset 1: death.csv and incd.csv were not enough for data analysis. With further research, I have found more information and work on them to add more data. I have created 4 extra .csv files with data on AgeSex, Income, Insurance and Poverty. (R Code used for these data, respectively: Data-AgeSex.R, Data-Income.R, Data-Insurance.R, Data-Poverty.R)
+
+Importing the data:
+
+``` {r} 
+wd <- "/Users/PhuongAnh/STAT350-Project"
+setwd(wd)
+death = read.csv("death.csv")
+incident = read.csv("incd.csv")
+agesex = read.csv("agesex.csv")
+income = read.csv("income.csv")
+insurance = read.csv("insurance.csv")
+poverty = read.csv("poverty.csv")
+```
+
+Merge by FIPS and Rename the Data.
+
+**FIPS:** The 5 digits code with the first 2 number is State Code and 3 last numbers are the county code  
+**County:** Name of the county and state  
+**Total.Population:** Total population in the county  
+**Total.Male:** Total Male in the county  
+**Total.Female:** Total Female in the county  
+**Median.Age:** Median Age by county  
+**Median.Age_Male:** Male Median Age by county  
+**Median.Age_Female:** Female Median Age by county  
+**Median.Income:** Median Income by county  
+**Insurance.Coverage:** Number of people is covered by at least one type of health insurance  
+**Poverty:** Number of Poverty Status  
+**Average.Deaths.per.Year:** Average Count of death by county  
+**Age.Adjusted.Death.Rate:** Age Adjusted Death Rate per 100,000   
+**Death.Rates.Trend:** Death Rate Trends  
+**Age.Adjusted.Incidence.Rate:** Age Adjusted Incidence Rate per 100,000   
+**Incidence.Rate.Trend:** Incidence Rate Trend  
+**Average.Annual.Count:** Average Count of Incidence by county  
+
+``` {r}
+agesex = agesex[c("Total.Population","Total.Male","Total.Female","Median.Age", "Median.Age_Male", "Median.Age_Female","FIPS")]
+income = income[c("Median.Income", "FIPS")]
+insurance = insurance[c("Insurance.Coverage","FIPS")]
+poverty = poverty[c("Poverty","FIPS")]
+data = merge(x= agesex, y=income, by="FIPS", all=TRUE)
+data = merge(x= data, y=insurance, by="FIPS", all=TRUE)
+data = merge(x= data, y=poverty, by="FIPS", all=TRUE)
+death = death[c("County","FIPS","Age.Adjusted.Death.Rate","Average.Deaths.per.Year","Recent.5.Year.Trend..2..in.Death.Rates")]
+incident = incident[c("FIPS","Age.Adjusted.Incidence.Rate...cases.per.100.000","Average.Annual.Count","Recent.5.Year.Trend.in.Incidence.Rates")]
+ALLDATA = merge(x=death, y=incident, by="FIPS", all=TRUE)
+ALLDATA = merge(x=ALLDATA, y=data, by="FIPS", all=TRUE)
+ALLDATA = ALLDATA[-which(is.na(ALLDATA$County)),]
+colnames(ALLDATA)[5] <- "Death.Rates.Trend"
+colnames(ALLDATA)[6] <- "Age.Adjusted.Incidence.Rate"
+colnames(ALLDATA)[8] <- "Incidence.Rate.Trend"
+```
+
+For FIPS = 0: USA, we will use the total of each column: Total Population, Total Male, Total Female, Insurance Coverage, Total Poverty
+```{r}
+ALLDATA$Average.Deaths.per.Year <- as.numeric((ALLDATA$Average.Deaths.per.Year))
+ALLDATA$Average.Annual.Count <- as.numeric((ALLDATA$Average.Annual.Count))
+ALLDATA[1,9] = sum(ALLDATA[-1,9], na.rm=TRUE) #TOTAL POPULATION
+ALLDATA[1,10] = sum(ALLDATA[-1,10], na.rm=TRUE) #TOTAL MALE
+ALLDATA[1,11] = sum(ALLDATA[-1,11], na.rm=TRUE)  #TOTAL FEMALE
+ALLDATA[1,16] = sum(ALLDATA[-1,16], na.rm=TRUE) #INSUARANCE COVERAGE
+ALLDATA[1,17] = sum(ALLDATA[-1,17], na.rm=TRUE) #POVERTY
+```
+
+For each county, the population are varies. Therefore, it is easier to work with percentage.
+
+**Male Percent:** Total Male/Total Population  
+**Poverty_Percent:** Total Poverty Status/Total Population  
+**Insurance_Percent:** Total People with Insuarance/Total Population  
+**Death_Rate:** Average Deaths per Year/Total Population  
+**Incidence_Rate:** Average Incidence per Year/Total Population  
+
+```{r}
+ALLDATA$Male_Percent = ALLDATA$Total.Male/ALLDATA$Total.Population
+ALLDATA$Female_Percent = ALLDATA$Total.Female/ALLDATA$Total.Population
+ALLDATA$Poverty_Percent = ALLDATA$Poverty/ALLDATA$Total.Population
+ALLDATA$Insurance_Percent = ALLDATA$Insurance.Coverage/ALLDATA$Total.Population
+ALLDATA$Death_Rate = ALLDATA$Average.Deaths.per.Year/ALLDATA$Total.Population
+ALLDATA$Incidence_Rate = ALLDATA$Average.Annual.Count/ALLDATA$Total.Population
+```
+
+Looking at our data, there are 6 datapoints with N/A Death Rates. This is because there is no Population Data for these 6 counties. We are removing because these 6 points because mortality rate is the targeted variable. 
+
+```{r}
+CLEANDATA = ALLDATA[-which(is.na(ALLDATA$Death_Rate)),]
+CLEANDATA$Average.Deaths.per.Year <- as.numeric((CLEANDATA$Average.Deaths.per.Year))
+```
+
+Remove FIPS = 15005 and 48301 because Incident_Rate >1. There might be data inconsistency.
+```{r}
+CLEANDATA=CLEANDATA[CLEANDATA$FIPS!="15005",]
+CLEANDATA=CLEANDATA[CLEANDATA$FIPS!="48301",]
+```
+
+Remove entries with Average Death per Year <16. Accoording to the dataset information, the county which has an "*" for age adjusted death rates are supressed. These data may cause bias to our model.  
+```{r}
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="1",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="2",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="3",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="4",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="5",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="6",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="7",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="8",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="9",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="10",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="11",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="12",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="13",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="14",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="15",]
+CLEANDATA=CLEANDATA[CLEANDATA$Average.Deaths.per.Year!="16",]
+```
+
+Add a **DATA POINT:** Average of all columns, excluding the FIPS = 0 (USA Total). There are over 3000 counties with various population, I want to get a datapoint that is the mean of everything. If this data point became an outliers, that means the data is skewed.
+```{r warning = FALSE, message = FALSE}
+library(dplyr)
+CLEANDATA.noUS=CLEANDATA[-c(1),]
+Mean = summarize_all(CLEANDATA.noUS,mean)
+finaldata = rbind(CLEANDATA,Mean)
+```
+
+
+First look at Data: Create a pairs plot to see the relationship between variables of interest.
+```{r}
+pairs(~Death_Rate+Median.Age+Median.Income+Insurance_Percent+Male_Percent+Incidence_Rate+Poverty_Percent, data=finaldata)
+```
+
+We can see that there are some linear relationship between some data points such as Insurance Percent and Male Percent, Death Rate and Incidence Rate.
+
+### METHODS {.css_class}
+
+To analyze the data, we will use these methods:
+
+1. Linear Regression Model:  
+   - One Linear Regression Model for Death Rate and Incidence Rate
+   - One Linear Regression Model for Death Rate and Other Factors.  
+   Using Linear Regression Model, we can determine the relationship between dependent variable (Mortality Rate) and Other Variables (Predictors). Through this analysis,    we can determine the strength of each predictors on the dependent variable.
+
+2. Backward Elimination 
+  We will use backward elimination to choose an optimal model for Death Rate and Other Factors. There are a lot of Factors to be consider, with Backward Selection, we can  try to fit all variable to the model and eliminate one by one the factor that is not meet the requirement.
+  We will use ANOVA Table to get the F statistics for each regressor.
+  Upon completing Backward Elimination, we weill determine which factors are most significant to our data.
+
+3. Multicollinearity
+  We would like to see if the coefficients for each factors are independent of each other. We will compute Variance Inflation Factors for each factors to measure the combined effect of the linear dependencies among the regressors.
+
+4. Check the influence of possible influential observations
+  We will use hii to compute the leverages for observations.
+  We will use Cook's Distance to find influential data.
+
+5. Residual Analysis
+  With this analysis, we want to see if the linear model is appropriate, hence, the regressors are valid. 
+  We will perform Variance Stabilizing Transformation if necessary.
+  
+  
+### RESULTS {.css_class}
+
+**1. LINEAR REGRESSION MODEL**
+
+**First, I want to examine the relationships between Incidence Rate and Death Rate. **
+
+```{r, out.width="50%"}
+Death.Incd.lm = lm(Death_Rate~Incidence_Rate, data=finaldata)
+plot(Death.Incd.lm)
+summary(Death.Incd.lm)
+anova(Death.Incd.lm)
+```
+- With adjusted R-squared = 0.5606, the model accounts for 56.06% of the total observed variance. This can be seen in the Fitted Values plot, where there is part of data that is in the left tail.  
+- The (P>|t|) <2.e-16 shows that the parameter is statistically significant.  
+==> (1) Conclude that there is a positive relationship between the Mortality Rate and Incidence Rate.
+
+**Linear Regression Model for Mortality Rate and Other Factors.**
+
+```{r, out.width="50%"}
+Death.Factor.lm1 = lm(Death_Rate~Median.Age+Median.Income+Insurance_Percent+Male_Percent+Poverty_Percent, data=finaldata)
+plot(Death.Factor.lm1)
+summary(Death.Factor.lm1)
+anova(Death.Factor.lm1)
+```
+- With adjusted R-squared = 0.1544, the model accounts for 15,44% of the total observed variance.  
+- Looking at Residual vs Fitted graph, we see that there is ppart of data that does not fit to the model.
+- Examine the p-values for each coefficient, we see that Pvalue for Poverty-Percent is large. The F-value for Poverty is 4.1498 according to ANOVA table.
+==> (2) Poverty is not a significant to Mortality Rate.
+- We will need to do a Backward Elimination Regression to find a more optimal model.
+
+**2. BACKWARD ELIMINATION REGRESSION**
+
+*Elimate "Poverty_Percent" from the model*
+
+```{r, out.width="50%"}
+Death.Factor.lm2 = lm(Death_Rate~Median.Age+Median.Income+Insurance_Percent+Male_Percent, data=finaldata)
+plot(Death.Factor.lm2)
+summary(Death.Factor.lm2)
+anova(Death.Factor.lm2)
+```
+- After eliminate "Poverty_Percent", the p-values for each regressors are significant. The ANOVA table also shows large F values which much higher that Fout=4.
+
+We will take this model as our model.
+```{r}
+Death.Factor.lm=Death.Factor.lm2
+```
+
+==> (3) Median Age, Median Income, Insurance Percent and Male Percent has significant affect on Death Rate.
+
+**3. MULTICOLLINEARITY**
+
+```{r, warning = FALSE, message = FALSE}
+detach("package:dplyr", unload=TRUE)
+library(car)
+vif(Death.Factor.lm)
+```
+
+- All VIFs are lower than 5, there is no prove of multicollinearity for this model.
+==> (4) There is no multicollinearity between the regressors.
+
+**4. INFLUENTIAL OBSERVATIONS**
+
+First, we are looking for high leverage points.
+```{r}
+finaldata.noNA = na.omit(finaldata)
+X<-cbind(rep(1,length(finaldata.noNA$Death_Rate)), finaldata.noNA$Median.Age, finaldata.noNA$Median.Income, finaldata.noNA$Male_Percent)
+hii<-diag(X%*%solve(t(X)%*%X)%*%t(X),)
+p<-ncol(X) 
+n<-nrow(X) 
+which(hii>2*p/n) 
+```
+
+- There are 223 high leverage points. It is a high number of leverage points.
+
+```{r, warning = FALSE, message = FALSE }
+library(olsrr)
+ols_plot_cooksd_chart(Death.Factor.lm)
+```
+
+- Looking at the Cook's D Chart, there are a lot of data point pass the threshold of 0.002. However, in the Residual vs Leverage chart for the model, the threshold is 0.5. If using this threshold, there is no infuential data point.
+
+**5. RESIDUAL ANALYSIS**
+```{r, out.width="50%"}
+hist(Death.Factor.lm$residuals)
+plot(density(Death.Factor.lm$residuals))
+qqnorm(Death.Factor.lm$residuals)
+
+linear.student.resid = rstudent(Death.Factor.lm)
+plot(Death.Factor.lm$fitted,linear.student.resid)
+title("Studentized residuals versus predicted")
+```
+
+The residual histogram shows a high frequency (>1500) residual points from -0.01 to 0.00. This makes the residual skewed to the left, and there are more lower value than predicted.
+The QQ Plot also shows that the linear doesn't follow a Normal distribution
+
+==> We will try to transform the the data y=ln(y)
+
+**Variance stabilizing transformations**
+```{r, out.width="50%"}
+ln.Death_Rate=log(finaldata$Death_Rate)
+linear.ln.Death = lm(ln.Death_Rate~Median.Age+Median.Income+Insurance_Percent+Male_Percent+Poverty_Percent, data=finaldata)
+plot(linear.ln.Death)
+linear.ln.Death.student.resid = rstudent(linear.ln.Death)
+plot(linear.ln.Death$fitted.values, linear.ln.Death.student.resid)
+title("Studentized residuals versus fittled values")
+
+hist(linear.ln.Death$residuals)
+plot(density(linear.ln.Death$residuals))
+qqnorm(linear.ln.Death$residuals)
+```
+
+
+With the data transformed from y to ln(y):  
+- Residuals vs Fitted: The residuals are more spread (doesnot have any patterns). The model looks more linear.  
+- Normal QQ Plot, Histogram and Density: The residual follow closer to Normal Distribution.  
+- Cook's Distance Chart: If using threshold=0.05, there will be 2 leverage points 428 and 2365.  
+
+==> Log-transforming worked to stabilize the variance.
+
+### CONCLUSION {.css_class}
+
+From our data analysis, we have the results:
+
+  (1) There is a positive relationship between the Mortality Rate and Incidence Rate.  
+  (2) Poverty is not a significant to Mortality Rate.  
+  (3) Median Age, Median Income, Insurance Percent and Male Percent has significant affect on Death Rate.  
+  (4) There is no multicollinearity between the regressors.  
+
+In conclusion, we find that Incidence Rate,Median Age, Median Income, Insurance Percent and Male Percent affects the Lung Cancer Mortality Rate for counties in the USA.
+However, there can still be improvements to the model, recommend to look for extra factors. The data observed needs more investigation. Maybe separate based on some criteria (small, large population) to fit each model better.
+
+### APPENDIX {.css_class}
+
+<https://github.com/annalpapham/STAT350-Final-Project>
+
+
+
+
